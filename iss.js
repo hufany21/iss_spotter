@@ -1,95 +1,79 @@
 const request = require('request');
-
-/**
- * Makes a single API request to retrieve the user's IP address.
- * Input:
- *   - A callback (to pass back an error or the IP string)
- * Returns (via Callback):
- *   - An error, if any (nullable)
- *   - The IP address as a string (null if error). Example: "162.245.144.188"
- */
 const fetchMyIP = function(callback) {
-  request(`https://api.ipify.org/?format=jsonhttps://api.ipify.org?format=json`, (error, response, body) => {
-    if (error) return callback(error, null);
-
-    if (response.statusCode !== 200) {
-      callback(Error(`Status Code ${response.statusCode} when fetching IP: ${body}`), null);
-      return;
-    }
-
-    
-    const ip = body;
-
-    callback(error, ip);
-  });
-};
-
-const fetchCoordsByIP  = function(ip, callback) {
-  request(`https://api.freegeoip.app/json/${ip}?apikey=c55bcf10-3eb8-11ec-ad38-d37364c48939`, (error, response, body) => {
-
-    if (error) return callback(error, null);
-
-    if (response.statusCode !== 200) {
-      callback(Error(`Status Code ${response.statusCode} when fetching IP: ${body}`), null);
-      return;
-    }
-    let data = JSON.parse(body);
-    data = {longitude: data.longitude, latitude: data.latitude};
-
-    callback(error, data);
-    
-    
-  });    
-};
-const fetchISSFlyOverTimes = function(coords, callback) {
-  const url = `https://iss-pass.herokuapp.com/json/?lat=${coords.latitude}&lon=${coords.longitude}`;
-
-  request(url, (error, response, body) => {
+  request(`https://api.ipify.org?format=json`, (error, response, body) => {
     if (error) {
       callback(error, null);
       return;
     }
-
+    // if non-200 status, assume server error
     if (response.statusCode !== 200) {
-      callback(Error(`Status Code ${response.statusCode} when fetching ISS pass times: ${body}`), null);
+      const msg = `Status Code ${response.statusCode} when fetching IP. Response: ${body}`;
+      callback(Error(msg), null);
       return;
     }
-
-    const passes = JSON.parse(body).response;
-    callback(null, passes);
+  
+    const data = JSON.parse(body);
+    callback(null, data.ip);
+  });
+  // use request to fetch IP address from JSON API
+};
+const fetchCoordsByIP = function(ip, callback) {
+  request(`https://api.freegeoip.app/json/${ip}?apikey=7c8714f0-3df0-11ec-a134-3f1c9da311a1`, (error, response, body) => {
+    if (error) {
+      callback(error, null);
+      return;
+    }
+    // if non-200 status, assume server error
+    if (response.statusCode !== 200) {
+      const msg = `Status Code ${response.statusCode} when fetching coords. Response: ${body}`;
+      callback(Error(msg), null);
+      return;
+    }
+  
+    const data = JSON.parse(body);
+    let cords = {longitude: data.longitude, latitude: data.latitude};
+    callback(null, cords);
   });
 };
-
+const fetchISSFlyOverTimes = function(coords, callback) {
+  request(`https://iss-pass.herokuapp.com/json/?lat=${coords.latitude}&lon=${coords.longitude}`, (error, response, body) => {
+    if (error) {
+      callback(error, null);
+      return;
+    }
+    // if non-200 status, assume server error
+    if (response.statusCode !== 200) {
+      const msg = `Status Code ${response.statusCode} when fetching flyovers. Response: ${body}`;
+      callback(Error(msg), null);
+      return;
+    }
+  
+    const data = JSON.parse(body);
+    let times = data.response;
+    callback(null, times);
+  });
+};
 const nextISSTimesForMyLocation = function(callback) {
   fetchMyIP((error, ip) => {
     if (error) {
       return callback(error, null);
     }
 
-    fetchCoordsByIP(ip, (error, loc) => {
+    fetchCoordsByIP(ip, (error, cords) => {
       if (error) {
         return callback(error, null);
       }
 
-      fetchISSFlyOverTimes(loc, (error, nextPasses) => {
+      fetchISSFlyOverTimes(cords, (error, times) => {
         if (error) {
           return callback(error, null);
         }
 
-        callback(null, nextPasses);
+        callback(null, times);
       });
     });
   });
 };
 
 
-
-// use request to fetch IP address from JSON API
-
-
-module.exports = {
-  fetchMyIP,
-  fetchCoordsByIP,
-  fetchISSFlyOverTimes,
-  nextISSTimesForMyLocation
-};
+module.exports = { fetchMyIP, fetchCoordsByIP, fetchISSFlyOverTimes, nextISSTimesForMyLocation };
